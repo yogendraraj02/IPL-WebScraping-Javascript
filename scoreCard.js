@@ -2,7 +2,7 @@ let request = require("request");
 let cheerio = require("cheerio");
 let fs = require("fs");
 let path = require("path");
-
+let xlsx = require("xlsx");
 function callbackforEachMatch(error , response , html){
     if(error){
         console.log("error:",error);
@@ -66,9 +66,11 @@ function getDataFromEachMatch(html){
     searchTool = cheerio.load(html);
     let matchdetails = searchTool(".match-info.match-info-MATCH.match-info-MATCH-half-width .description");
     matchdetails = matchdetails.text().split(",");
-    console.log("matchdetails:",matchdetails);
+    //console.log("matchdetails:",matchdetails);
     let resultt = searchTool(".match-info.match-info-MATCH.match-info-MATCH-half-width .status-text").text();
-   
+
+    console.log("`````````````````````````````````````````````````````````````````````````````````````````````");
+    console.log(`${first_team_name} VS ${sec_team_name} Result -> ${resultt} ${matchdetails[1]} ${matchdetails[2]} `);
     let playerpath = "";
     let cnt = 0;
     let myTeamName,myOpponentTeam , name,result,venue,matchdate,runs,balls,fours,sixes,sr;
@@ -103,17 +105,17 @@ function getDataFromEachMatch(html){
              sr = value;
         } else if(line == 8){
            
-           // console.log(myTeamName,myOpponentTeam , name,result,venue,matchdate,runs,balls,fours,sixes,sr , folder_path);
-            makeFiles(myTeamName , name , venue ,matchdate , myOpponentTeam , result , runs , balls , fours , sixes , sr , folder_path);
+            console.log(`${name} | ${runs} | ${balls} | ${fours} | ${sixes} | ${sr}`);
+            makejsonFiles(myTeamName , name , venue ,matchdate , myOpponentTeam , result , runs , balls , fours , sixes , sr , folder_path);
            
          }
        
         line++;
     }
-  
+    console.log("`````````````````````````````````````````````````````````````````````````````````````````````\n\n");
 }
 
-function makeFiles(myTeam, playerName, venue, date, opponentTeam, result, runs, balls, fours, sixes ,sr,folder_path){
+function makejsonFiles(myTeam, playerName, venue, date, opponentTeam, result, runs, balls, fours, sixes ,sr,folder_path){
     
     let playerNamePath = path.join(folder_path,playerName + ".json");
     let contentinArr = [];
@@ -127,10 +129,39 @@ function makeFiles(myTeam, playerName, venue, date, opponentTeam, result, runs, 
     }
     contentinArr.push(matchObject);
     fs.writeFileSync(playerNamePath, JSON.stringify(contentinArr));
+    
+    // now for excel files
+    let excelFilepath = path.join(folder_path ,"excelFiles" );
+    dirCreator(excelFilepath);
+    excelFilepath = path.join(excelFilepath ,playerName + ".xlsx");
+    
+    let content = excelReader(excelFilepath ,playerName);
+    content.push(matchObject);
+    excelWriter(excelFilepath , content ,playerName);
 
  }
+function dirCreator(filepath){
+    if(fs.existsSync(filepath) == false){
+        fs.mkdirSync(filepath);
+    }
+}
 
+function excelWriter(filepath , jsonData , sheetname){
+    let newWB = xlsx.utils.book_new();
+    let newWs = xlsx.utils.json_to_sheet(jsonData);
+    xlsx.utils.book_append_sheet(newWB , newWs , sheetname);
+    xlsx.writeFile(newWB , filepath);
+}
 
+function excelReader(filepath , sheetname){
+    if(fs.existsSync(filepath) == false){
+        return [];
+    }
+    let wb = xlsx.readFile(filepath);
+    let excelData = wb.Sheets[sheetname];
+    let ans = xlsx.utils.sheet_to_json(excelData);
+    return ans;
+}
  module.exports = {
     callbackforEachMatch
  }
